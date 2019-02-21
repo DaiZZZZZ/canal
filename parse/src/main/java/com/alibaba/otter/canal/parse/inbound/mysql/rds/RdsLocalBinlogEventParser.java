@@ -57,11 +57,7 @@ public class RdsLocalBinlogEventParser extends LocalBinlogEventParser implements
             if (entryPosition == null) {
                 throw new PositionNotFoundException("position not found!");
             }
-            Long startTimeInMill = entryPosition.getTimestamp();
-            if (startTimeInMill == null || startTimeInMill <= 0) {
-                throw new PositionNotFoundException("position timestamp is empty!");
-            }
-
+            long startTimeInMill = entryPosition.getTimestamp();
             startTime = startTimeInMill;
             List<BinlogFile> binlogFiles = RdsBinlogOpenApi.listBinlogFiles(url,
                 accesskey,
@@ -69,10 +65,6 @@ public class RdsLocalBinlogEventParser extends LocalBinlogEventParser implements
                 instanceId,
                 new Date(startTime),
                 new Date(endTime));
-            if (binlogFiles.isEmpty()) {
-                throw new CanalParseException("start timestamp : " + startTimeInMill + " binlog files is empty");
-            }
-
             binlogDownloadQueue = new BinlogDownloadQueue(binlogFiles, batchFileSize, directory);
             binlogDownloadQueue.silenceDownload();
             needWait = true;

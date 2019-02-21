@@ -1,7 +1,9 @@
 package com.alibaba.otter.canal.client.kafka;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -11,38 +13,27 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
 import com.alibaba.fastjson.JSON;
-import com.alibaba.otter.canal.client.CanalMQConnector;
-import com.alibaba.otter.canal.client.impl.SimpleCanalConnector;
 import com.alibaba.otter.canal.protocol.FlatMessage;
 import com.alibaba.otter.canal.protocol.Message;
-import com.alibaba.otter.canal.protocol.exception.CanalClientException;
-import com.google.common.collect.Lists;
 
 /**
  * canal kafka 数据操作客户端
  *
- * <pre>
- * 注意点：
- * 1. 相比于canal {@linkplain SimpleCanalConnector}, 这里get和ack操作不能有并发, 必须是一个线程执行get后，内存里执行完毕ack后再取下一个get
- * </pre>
- *
  * @author machengyuan @ 2018-6-12
- * @version 1.1.1
+ * @version 1.0.0
  */
-public class KafkaCanalConnector implements CanalMQConnector {
+public class KafkaCanalConnector {
 
-    protected KafkaConsumer<String, Message> kafkaConsumer;
-    protected KafkaConsumer<String, String>  kafkaConsumer2;                            // 用于扁平message的数据消费
-    protected String                         topic;
-    protected Integer                        partition;
-    protected Properties                     properties;
-    protected volatile boolean               connected      = false;
-    protected volatile boolean               running        = false;
-    protected boolean                        flatMessage;
+    private KafkaConsumer<String, Message> kafkaConsumer;
+    private KafkaConsumer<String, String>  kafkaConsumer2;   // 用于扁平message的数据消费
+    private String                         topic;
+    private Integer                        partition;
+    private Properties                     properties;
+    private volatile boolean               connected = false;
+    private volatile boolean               running   = false;
+    private boolean                        flatMessage;
 
-    private Map<Integer, Long>               currentOffsets = new ConcurrentHashMap<>();
-
-    public KafkaCanalConnector(String servers, String topic, Integer partition, String groupId, Integer batchSize,
+    public KafkaCanalConnector(String servers, String topic, Integer partition, String groupId,
                                boolean flatMessage){
         this.topic = topic;
         this.partition = partition;
@@ -56,10 +47,7 @@ public class KafkaCanalConnector implements CanalMQConnector {
         properties.put("auto.offset.reset", "latest"); // 如果没有offset则从最后的offset开始读
         properties.put("request.timeout.ms", "40000"); // 必须大于session.timeout.ms的设置
         properties.put("session.timeout.ms", "30000"); // 默认为30秒
-        if (batchSize == null) {
-            batchSize = 100;
-        }
-        properties.put("max.poll.records", batchSize.toString());
+        properties.put("max.poll.records", "100");
         properties.put("key.deserializer", StringDeserializer.class.getName());
         if (!flatMessage) {
             properties.put("value.deserializer", MessageDeserializer.class.getName());
@@ -69,18 +57,29 @@ public class KafkaCanalConnector implements CanalMQConnector {
     }
 
     /**
+     * 重新设置sessionTime
+     *
+     * @param timeout
+     * @param unit
+     */
+    public void setSessionTimeout(Long timeout, TimeUnit unit) {
+        long t = unit.toMillis(timeout);
+        properties.put("request.timeout.ms", String.valueOf(t + 60000));
+        properties.put("session.timeout.ms", String.valueOf(t));
+    }
+
+    /**
      * 打开连接
      */
-    @Override
     public void connect() {
         if (connected) {
             return;
         }
 
         connected = true;
+
         if (kafkaConsumer == null && !flatMessage) {
             kafkaConsumer = new KafkaConsumer<String, Message>(properties);
-
         }
         if (kafkaConsumer2 == null && flatMessage) {
             kafkaConsumer2 = new KafkaConsumer<String, String>(properties);
@@ -90,25 +89,21 @@ public class KafkaCanalConnector implements CanalMQConnector {
     /**
      * 关闭链接
      */
-    @Override
     public void disconnect() {
         if (kafkaConsumer != null) {
             kafkaConsumer.close();
-            kafkaConsumer = null;
         }
         if (kafkaConsumer2 != null) {
             kafkaConsumer2.close();
-            kafkaConsumer2 = null;
         }
 
         connected = false;
     }
 
-    protected void waitClientRunning() {
+    private void waitClientRunning() {
         running = true;
     }
 
-    @Override
     public boolean checkValid() {
         return true;// 默认都放过
     }
@@ -116,7 +111,6 @@ public class KafkaCanalConnector implements CanalMQConnector {
     /**
      * 订阅topic
      */
-    @Override
     public void subscribe() {
         waitClientRunning();
         if (!running) {
@@ -144,7 +138,6 @@ public class KafkaCanalConnector implements CanalMQConnector {
     /**
      * 取消订阅
      */
-    @Override
     public void unsubscribe() {
         waitClientRunning();
         if (!running) {
@@ -159,71 +152,61 @@ public class KafkaCanalConnector implements CanalMQConnector {
         }
     }
 
-    @Override
-    public List<Message> getList(Long timeout, TimeUnit unit) throws CanalClientException {
+    /**
+     * 获取数据，自动进行确认
+     *
+     * @return
+     */
+    public List<Message> get() {
+        return get(100L, TimeUnit.MILLISECONDS);
+    }
+
+    public List<Message> get(Long timeout, TimeUnit unit) {
         waitClientRunning();
         if (!running) {
-            return Lists.newArrayList();
+            return null;
         }
 
-        List<Message> messages = getListWithoutAck(timeout, unit);
-        if (messages != null && !messages.isEmpty()) {
-            this.ack();
-        }
+        List<Message> messages = getWithoutAck(timeout, unit);
+        this.ack();
         return messages;
     }
 
-    @Override
-    public List<Message> getListWithoutAck(Long timeout, TimeUnit unit) throws CanalClientException {
+    public List<Message> getWithoutAck() {
+        return getWithoutAck(100L, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * 获取数据，不进行确认，等待处理完成手工确认
+     *
+     * @return
+     */
+    public List<Message> getWithoutAck(Long timeout, TimeUnit unit) {
         waitClientRunning();
         if (!running) {
-            return Lists.newArrayList();
+            return null;
         }
 
-        ConsumerRecords<String, Message> records = kafkaConsumer.poll(unit.toMillis(timeout));
-
-        currentOffsets.clear();
-        for (TopicPartition topicPartition : records.partitions()) {
-            currentOffsets.put(topicPartition.partition(), kafkaConsumer.position(topicPartition));
-        }
+        ConsumerRecords<String, Message> records = kafkaConsumer.poll(unit.toMillis(timeout)); // 基于配置，最多只能poll到一条数据
 
         if (!records.isEmpty()) {
+            // return records.iterator().next().value();
             List<Message> messages = new ArrayList<>();
             for (ConsumerRecord<String, Message> record : records) {
                 messages.add(record.value());
             }
             return messages;
         }
-        return Lists.newArrayList();
+        return null;
     }
 
-    @Override
-    public List<FlatMessage> getFlatList(Long timeout, TimeUnit unit) throws CanalClientException {
+    public List<FlatMessage> getFlatMessageWithoutAck(Long timeout, TimeUnit unit) {
         waitClientRunning();
         if (!running) {
-            return Lists.newArrayList();
-        }
-
-        List<FlatMessage> messages = getFlatListWithoutAck(timeout, unit);
-        if (messages != null && !messages.isEmpty()) {
-            this.ack();
-        }
-        return messages;
-    }
-
-    @Override
-    public List<FlatMessage> getFlatListWithoutAck(Long timeout, TimeUnit unit) throws CanalClientException {
-        waitClientRunning();
-        if (!running) {
-            return Lists.newArrayList();
+            return null;
         }
 
         ConsumerRecords<String, String> records = kafkaConsumer2.poll(unit.toMillis(timeout));
-
-        currentOffsets.clear();
-        for (TopicPartition topicPartition : records.partitions()) {
-            currentOffsets.put(topicPartition.partition(), kafkaConsumer2.position(topicPartition));
-        }
 
         if (!records.isEmpty()) {
             List<FlatMessage> flatMessages = new ArrayList<>();
@@ -235,32 +218,12 @@ public class KafkaCanalConnector implements CanalMQConnector {
 
             return flatMessages;
         }
-        return Lists.newArrayList();
-    }
-
-    @Override
-    public void rollback() {
-        waitClientRunning();
-        if (!running) {
-            return;
-        }
-        // 回滚所有分区
-        if (kafkaConsumer != null) {
-            for (Map.Entry<Integer, Long> entry : currentOffsets.entrySet()) {
-                kafkaConsumer.seek(new TopicPartition(topic, entry.getKey()), entry.getValue() - 1);
-            }
-        }
-        if (kafkaConsumer2 != null) {
-            for (Map.Entry<Integer, Long> entry : currentOffsets.entrySet()) {
-                kafkaConsumer2.seek(new TopicPartition(topic, entry.getKey()), entry.getValue() - 1);
-            }
-        }
+        return null;
     }
 
     /**
      * 提交offset，如果超过 session.timeout.ms 设置的时间没有ack则会抛出异常，ack失败
      */
-    @Override
     public void ack() {
         waitClientRunning();
         if (!running) {
@@ -271,55 +234,16 @@ public class KafkaCanalConnector implements CanalMQConnector {
             kafkaConsumer.commitSync();
         }
         if (kafkaConsumer2 != null) {
-            kafkaConsumer2.commitSync();
+            kafkaConsumer2.commitAsync();
         }
     }
 
-    @Override
-    public void subscribe(String filter) throws CanalClientException {
-        throw new CanalClientException("mq not support this method");
+    public void stopRunning() {
+        if (running) {
+            running = false; // 设置为非running状态
+            // if (!mutex.state()) {
+            // mutex.set(true); // 中断阻塞
+            // }
+        }
     }
-
-    @Override
-    public Message get(int batchSize) throws CanalClientException {
-        throw new CanalClientException("mq not support this method");
-    }
-
-    @Override
-    public Message get(int batchSize, Long timeout, TimeUnit unit) throws CanalClientException {
-        throw new CanalClientException("mq not support this method");
-    }
-
-    @Override
-    public Message getWithoutAck(int batchSize) throws CanalClientException {
-        throw new CanalClientException("mq not support this method");
-    }
-
-    @Override
-    public Message getWithoutAck(int batchSize, Long timeout, TimeUnit unit) throws CanalClientException {
-        throw new CanalClientException("mq not support this method");
-    }
-
-    @Override
-    public void ack(long batchId) throws CanalClientException {
-        throw new CanalClientException("mq not support this method");
-    }
-
-    @Override
-    public void rollback(long batchId) throws CanalClientException {
-        throw new CanalClientException("mq not support this method");
-    }
-
-    /**
-     * 重新设置sessionTime
-     *
-     * @param timeout
-     * @param unit
-     */
-    public void setSessionTimeout(Long timeout, TimeUnit unit) {
-        long t = unit.toMillis(timeout);
-        properties.put("request.timeout.ms", String.valueOf(t + 60000));
-        properties.put("session.timeout.ms", String.valueOf(t));
-    }
-
 }

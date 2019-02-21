@@ -1,12 +1,11 @@
 package com.alibaba.otter.canal.server.embedded;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import com.alibaba.otter.canal.spi.CanalMetricsProvider;
+import com.alibaba.otter.canal.spi.CanalMetricsService;
+import com.alibaba.otter.canal.spi.NopCanalMetricsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -15,7 +14,6 @@ import org.springframework.util.CollectionUtils;
 import com.alibaba.otter.canal.common.AbstractCanalLifeCycle;
 import com.alibaba.otter.canal.instance.core.CanalInstance;
 import com.alibaba.otter.canal.instance.core.CanalInstanceGenerator;
-import com.alibaba.otter.canal.protocol.CanalEntry;
 import com.alibaba.otter.canal.protocol.ClientIdentity;
 import com.alibaba.otter.canal.protocol.Message;
 import com.alibaba.otter.canal.protocol.position.LogPosition;
@@ -24,11 +22,7 @@ import com.alibaba.otter.canal.protocol.position.PositionRange;
 import com.alibaba.otter.canal.server.CanalServer;
 import com.alibaba.otter.canal.server.CanalService;
 import com.alibaba.otter.canal.server.exception.CanalServerException;
-import com.alibaba.otter.canal.spi.CanalMetricsProvider;
-import com.alibaba.otter.canal.spi.CanalMetricsService;
-import com.alibaba.otter.canal.spi.NopCanalMetricsService;
 import com.alibaba.otter.canal.store.CanalEventStore;
-import com.alibaba.otter.canal.store.memory.MemoryEventStoreWithBuffer;
 import com.alibaba.otter.canal.store.model.Event;
 import com.alibaba.otter.canal.store.model.Events;
 import com.google.common.base.Function;
@@ -46,12 +40,12 @@ import com.google.protobuf.ByteString;
  */
 public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements CanalServer, CanalService {
 
-    private static final Logger        logger  = LoggerFactory.getLogger(CanalServerWithEmbedded.class);
+    private static final Logger        logger           = LoggerFactory.getLogger(CanalServerWithEmbedded.class);
     private Map<String, CanalInstance> canalInstances;
     // private Map<ClientIdentity, Position> lastRollbackPostions;
     private CanalInstanceGenerator     canalInstanceGenerator;
     private int                        metricsPort;
-    private CanalMetricsService        metrics = NopCanalMetricsService.NOP;
+    private CanalMetricsService        metrics          = NopCanalMetricsService.NOP;
 
     private static class SingletonHolder {
 
@@ -213,7 +207,7 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
      * b. 如果timeout不为null
      *    1. timeout为0，则采用get阻塞方式，获取数据，不设置超时，直到有足够的batchSize数据才返回
      *    2. timeout不为0，则采用get+timeout方式，获取数据，超时还没有batchSize足够的数据，有多少返回多少
-     * 
+     *
      * 注意： meta获取和数据的获取需要保证顺序性，优先拿到meta的，一定也会是优先拿到数据，所以需要加同步. (不能出现先拿到meta，拿到第二批数据，这样就会导致数据顺序性出现问题)
      * </pre>
      */
@@ -245,23 +239,12 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
             } else {
                 // 记录到流式信息
                 Long batchId = canalInstance.getMetaManager().addBatch(clientIdentity, events.getPositionRange());
-                boolean raw = isRaw(canalInstance.getEventStore());
-                List entrys = null;
-                if (raw) {
-                    entrys = Lists.transform(events.getEvents(), new Function<Event, ByteString>() {
+                List<ByteString> entrys = Lists.transform(events.getEvents(), new Function<Event, ByteString>() {
 
-                        public ByteString apply(Event input) {
-                            return input.getRawEntry();
-                        }
-                    });
-                } else {
-                    entrys = Lists.transform(events.getEvents(), new Function<Event, CanalEntry.Entry>() {
-
-                        public CanalEntry.Entry apply(Event input) {
-                            return input.getEntry();
-                        }
-                    });
-                }
+                    public ByteString apply(Event input) {
+                        return input.getRawEntry();
+                    }
+                });
                 if (logger.isInfoEnabled()) {
                     logger.info("get successfully, clientId:{} batchSize:{} real size is {} and result is [batchId:{} , position:{}]",
                         clientIdentity.getClientId(),
@@ -272,7 +255,7 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
                 }
                 // 直接提交ack
                 ack(clientIdentity, batchId);
-                return new Message(batchId, raw, entrys);
+                return new Message(batchId, true, entrys);
             }
         }
     }
@@ -300,7 +283,7 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
      * b. 如果timeout不为null
      *    1. timeout为0，则采用get阻塞方式，获取数据，不设置超时，直到有足够的batchSize数据才返回
      *    2. timeout不为0，则采用get+timeout方式，获取数据，超时还没有batchSize足够的数据，有多少返回多少
-     * 
+     *
      * 注意： meta获取和数据的获取需要保证顺序性，优先拿到meta的，一定也会是优先拿到数据，所以需要加同步. (不能出现先拿到meta，拿到第二批数据，这样就会导致数据顺序性出现问题)
      * </pre>
      */
@@ -328,8 +311,7 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
             }
 
             if (CollectionUtils.isEmpty(events.getEvents())) {
-                // logger.debug("getWithoutAck successfully, clientId:{}
-                // batchSize:{} but result
+                // logger.debug("getWithoutAck successfully, clientId:{} batchSize:{} but result
                 // is null",
                 // clientIdentity.getClientId(),
                 // batchSize);
@@ -337,23 +319,12 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
             } else {
                 // 记录到流式信息
                 Long batchId = canalInstance.getMetaManager().addBatch(clientIdentity, events.getPositionRange());
-                boolean raw = isRaw(canalInstance.getEventStore());
-                List entrys = null;
-                if (raw) {
-                    entrys = Lists.transform(events.getEvents(), new Function<Event, ByteString>() {
+                List<ByteString> entrys = Lists.transform(events.getEvents(), new Function<Event, ByteString>() {
 
-                        public ByteString apply(Event input) {
-                            return input.getRawEntry();
-                        }
-                    });
-                } else {
-                    entrys = Lists.transform(events.getEvents(), new Function<Event, CanalEntry.Entry>() {
-
-                        public CanalEntry.Entry apply(Event input) {
-                            return input.getEntry();
-                        }
-                    });
-                }
+                    public ByteString apply(Event input) {
+                        return input.getRawEntry();
+                    }
+                });
                 if (logger.isInfoEnabled()) {
                     logger.info("getWithoutAck successfully, clientId:{} batchSize:{}  real size is {} and result is [batchId:{} , position:{}]",
                         clientIdentity.getClientId(),
@@ -362,7 +333,7 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
                         batchId,
                         events.getPositionRange());
                 }
-                return new Message(batchId, raw, entrys);
+                return new Message(batchId, true, entrys);
             }
 
         }
@@ -544,23 +515,15 @@ public class CanalServerWithEmbedded extends AbstractCanalLifeCycle implements C
             // 发现provider, 进行初始化
             if (list.size() > 1) {
                 logger.warn("Found more than one CanalMetricsProvider, use the first one.");
-                // 报告冲突
+                //报告冲突
                 for (CanalMetricsProvider p : list) {
                     logger.warn("Found CanalMetricsProvider: {}.", p.getClass().getName());
                 }
             }
-            // 默认使用第一个
+            //默认使用第一个
             CanalMetricsProvider provider = list.get(0);
             this.metrics = provider.getService();
         }
-    }
-
-    private boolean isRaw(CanalEventStore eventStore) {
-        if (eventStore instanceof MemoryEventStoreWithBuffer) {
-            return ((MemoryEventStoreWithBuffer) eventStore).isRaw();
-        }
-
-        return true;
     }
 
     // ========= setter ==========

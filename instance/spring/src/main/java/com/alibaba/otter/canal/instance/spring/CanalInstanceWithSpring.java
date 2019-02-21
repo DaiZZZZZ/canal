@@ -2,8 +2,6 @@ package com.alibaba.otter.canal.instance.spring;
 
 import java.util.List;
 
-import com.alibaba.otter.canal.instance.core.CanalInstance;
-import com.alibaba.otter.canal.instance.core.CanalMQConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +54,6 @@ public class CanalInstanceWithSpring extends AbstractCanalInstance {
 
     public void setAlarmHandler(CanalAlarmHandler alarmHandler) {
         this.alarmHandler = alarmHandler;
-    }
-
-    public void setMqConfig(CanalMQConfig mqConfig){
-        this.mqConfig = mqConfig;
     }
 
 }

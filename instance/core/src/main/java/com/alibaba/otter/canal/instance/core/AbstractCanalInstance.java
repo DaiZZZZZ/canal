@@ -38,9 +38,6 @@ public class AbstractCanalInstance extends AbstractCanalLifeCycle implements Can
     protected CanalEventSink<List<CanalEntry.Entry>> eventSink;                                                    // 链接parse和store的桥接器
     protected CanalMetaManager                       metaManager;                                                  // 消费信息管理器
     protected CanalAlarmHandler                      alarmHandler;                                                 // alarm报警机制
-    protected CanalMQConfig                          mqConfig;                                                     // mq的配置
-
-
 
     @Override
     public boolean subscribeChange(ClientIdentity identity) {
@@ -243,10 +240,5 @@ public class AbstractCanalInstance extends AbstractCanalLifeCycle implements Can
     @Override
     public CanalAlarmHandler getAlarmHandler() {
         return alarmHandler;
-    }
-
-    @Override
-    public CanalMQConfig getMqConfig() {
-        return mqConfig;
     }
 }

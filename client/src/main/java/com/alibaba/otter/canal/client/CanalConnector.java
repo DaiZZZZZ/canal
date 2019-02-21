@@ -149,4 +149,11 @@ public interface CanalConnector {
      * @throws CanalClientException
      */
     void rollback() throws CanalClientException;
+
+    /**
+     * 中断的阻塞，用于优雅停止client
+     * 
+     * @throws CanalClientException
+     */
+    void stopRunning() throws CanalClientException;
 }

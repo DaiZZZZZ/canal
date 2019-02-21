@@ -86,8 +86,7 @@ public class MysqlGTIDSet implements GTIDSet {
         if (gtidData == null || gtidData.length() < 1) {
             m = new HashMap<String, UUIDSet>();
         } else {
-            // 存在多个GTID时会有回车符
-            String[] uuidStrs = gtidData.replaceAll("\n", "").split(",");
+            String[] uuidStrs = gtidData.split(",");
             m = new HashMap<String, UUIDSet>(uuidStrs.length);
             for (int i = 0; i < uuidStrs.length; i++) {
                 UUIDSet uuidSet = UUIDSet.parse(uuidStrs[i]);

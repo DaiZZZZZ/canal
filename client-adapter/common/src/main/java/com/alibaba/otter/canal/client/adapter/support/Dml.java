@@ -7,43 +7,20 @@ import java.util.Map;
 /**
  * DML操作转换对象
  *
- * @author rewerma 2018-8-19 下午11:30:49
+ * @author machengyuan 2018-8-19 下午11:30:49
  * @version 1.0.0
  */
 public class Dml implements Serializable {
 
     private static final long         serialVersionUID = 2611556444074013268L;
 
-    private String                    destination;                            // 对应canal的实例或者MQ的topic
-    private String                    groupId;                                // 对应mq的group id
-    private String                    database;                               // 数据库或schema
-    private String                    table;                                  // 表名
-    private List<String>              pkNames;
-    private Boolean                   isDdl;
-    private String                    type;                                   // 类型: INSERT UPDATE DELETE
-    // binlog executeTime
-    private Long                      es;                                     // 执行耗时
-    // dml build timeStamp
-    private Long                      ts;                                     // 同步时间
-    private String                    sql;                                    // 执行的sql, dml sql为空
-    private List<Map<String, Object>> data;                                   // 数据列表
-    private List<Map<String, Object>> old;                                    // 旧数据列表, 用于update, size和data的size一一对应
-
-    public String getDestination() {
-        return destination;
-    }
-
-    public void setDestination(String destination) {
-        this.destination = destination;
-    }
-
-    public String getGroupId() {
-        return groupId;
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
+    private String                    database;
+    private String                    table;
+    private String                    type;
+    private Long                      ts;
+    private String                    sql;
+    private List<Map<String, Object>> data;
+    private List<Map<String, Object>> old;
 
     public String getDatabase() {
         return database;
@@ -59,22 +36,6 @@ public class Dml implements Serializable {
 
     public void setTable(String table) {
         this.table = table;
-    }
-
-    public List<String> getPkNames() {
-        return pkNames;
-    }
-
-    public void setPkNames(List<String> pkNames) {
-        this.pkNames = pkNames;
-    }
-
-    public Boolean getIsDdl() {
-        return isDdl;
-    }
-
-    public void setIsDdl(Boolean isDdl) {
-        this.isDdl = isDdl;
     }
 
     public String getType() {
@@ -117,20 +78,11 @@ public class Dml implements Serializable {
         this.old = old;
     }
 
-    public Long getEs() {
-        return es;
-    }
-
-    public void setEs(Long es) {
-        this.es = es;
-    }
-
     public void clear() {
         database = null;
         table = null;
         type = null;
         ts = null;
-        es = null;
         data = null;
         old = null;
         sql = null;
@@ -138,8 +90,7 @@ public class Dml implements Serializable {
 
     @Override
     public String toString() {
-        return "Dml{" + "destination='" + destination + '\'' + ", database='" + database + '\'' + ", table='" + table
-               + '\'' + ", type='" + type + '\'' + ", es=" + es + ", ts=" + ts + ", sql='" + sql + '\'' + ", data="
-               + data + ", old=" + old + '}';
+        return "Dml{" + "database='" + database + '\'' + ", table='" + table + '\'' + ", type='" + type + '\'' + ", ts="
+               + ts + ", sql='" + sql + '\'' + ", data=" + data + ", old=" + old + '}';
     }
 }

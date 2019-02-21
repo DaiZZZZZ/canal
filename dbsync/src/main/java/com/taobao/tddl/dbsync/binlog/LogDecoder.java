@@ -109,6 +109,11 @@ public final class LogDecoder {
                     try {
                         /* Decoding binary-log to event */
                         event = decode(buffer, header, context);
+                        if (event != null) {
+                            // set logFileName
+                            event.getHeader().setLogFileName(context.getLogPosition().getFileName());
+                            event.setSemival(buffer.semival);
+                        }
                     } catch (IOException e) {
                         if (logger.isWarnEnabled()) {
                             logger.warn("Decoding " + LogEvent.getTypeName(header.getType()) + " failed from: "
@@ -121,12 +126,6 @@ public final class LogDecoder {
                 } else {
                     /* Ignore unsupported binary-log. */
                     event = new UnknownLogEvent(header);
-                }
-
-                if (event != null) {
-                    // set logFileName
-                    event.getHeader().setLogFileName(context.getLogPosition().getFileName());
-                    event.setSemival(buffer.semival);
                 }
 
                 /* consume this binary-log. */
@@ -190,7 +189,6 @@ public final class LogDecoder {
                 /* updating position in context */
                 logPosition.position = header.getLogPos();
                 event.fillTable(context);
-                header.putGtid(context.getGtidSet(), gtidLogEvent);
                 return event;
             }
             case LogEvent.UPDATE_ROWS_EVENT_V1: {
@@ -198,7 +196,6 @@ public final class LogDecoder {
                 /* updating position in context */
                 logPosition.position = header.getLogPos();
                 event.fillTable(context);
-                header.putGtid(context.getGtidSet(), gtidLogEvent);
                 return event;
             }
             case LogEvent.DELETE_ROWS_EVENT_V1: {
@@ -206,7 +203,6 @@ public final class LogDecoder {
                 /* updating position in context */
                 logPosition.position = header.getLogPos();
                 event.fillTable(context);
-                header.putGtid(context.getGtidSet(), gtidLogEvent);
                 return event;
             }
             case LogEvent.ROTATE_EVENT: {
@@ -367,14 +363,6 @@ public final class LogDecoder {
             }
             case LogEvent.DELETE_ROWS_EVENT: {
                 RowsLogEvent event = new DeleteRowsLogEvent(header, buffer, descriptionEvent);
-                /* updating position in context */
-                logPosition.position = header.getLogPos();
-                event.fillTable(context);
-                header.putGtid(context.getGtidSet(), gtidLogEvent);
-                return event;
-            }
-            case LogEvent.PARTIAL_UPDATE_ROWS_EVENT: {
-                RowsLogEvent event = new UpdateRowsLogEvent(header, buffer, descriptionEvent, true);
                 /* updating position in context */
                 logPosition.position = header.getLogPos();
                 event.fillTable(context);

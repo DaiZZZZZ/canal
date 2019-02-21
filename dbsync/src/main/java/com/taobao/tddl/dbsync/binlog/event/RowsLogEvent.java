@@ -5,7 +5,6 @@ import java.util.BitSet;
 import com.taobao.tddl.dbsync.binlog.LogBuffer;
 import com.taobao.tddl.dbsync.binlog.LogContext;
 import com.taobao.tddl.dbsync.binlog.LogEvent;
-import com.taobao.tddl.dbsync.binlog.event.TableMapLogEvent.ColumnInfo;
 
 /**
  * Common base class for all row-containing log events.
@@ -62,7 +61,6 @@ public abstract class RowsLogEvent extends LogEvent {
 
     /** Bitmap denoting columns available */
     protected final int      columnLen;
-    protected final boolean  partial;
     protected final BitSet   columns;
 
     /**
@@ -72,8 +70,6 @@ public abstract class RowsLogEvent extends LogEvent {
      * the number of columns of the table on the master.
      */
     protected final BitSet   changeColumns;
-
-    protected int            jsonColumnCount         = 0;
 
     /** XXX: Don't handle buffer in another thread. */
     private final LogBuffer  rowsBuf;                           /*
@@ -113,10 +109,6 @@ public abstract class RowsLogEvent extends LogEvent {
     public static final int  RW_V_EXTRAINFO_TAG      = 0;
 
     public RowsLogEvent(LogHeader header, LogBuffer buffer, FormatDescriptionLogEvent descriptionEvent){
-        this(header, buffer, descriptionEvent, false);
-    }
-
-    public RowsLogEvent(LogHeader header, LogBuffer buffer, FormatDescriptionLogEvent descriptionEvent, boolean partial){
         super(header);
 
         final int commonHeaderLen = descriptionEvent.commonHeaderLen;
@@ -161,11 +153,9 @@ public abstract class RowsLogEvent extends LogEvent {
 
         buffer.position(commonHeaderLen + postHeaderLen + headerLen);
         columnLen = (int) buffer.getPackedLong();
-        this.partial = partial;
         columns = buffer.getBitmap(columnLen);
 
-        if (header.type == UPDATE_ROWS_EVENT_V1 || header.type == UPDATE_ROWS_EVENT
-            || header.type == PARTIAL_UPDATE_ROWS_EVENT) {
+        if (header.type == UPDATE_ROWS_EVENT_V1 || header.type == UPDATE_ROWS_EVENT) {
             changeColumns = buffer.getBitmap(columnLen);
         } else {
             changeColumns = columns;
@@ -185,17 +175,6 @@ public abstract class RowsLogEvent extends LogEvent {
             // delete original table map events stored in the map).
             context.clearAllTables();
         }
-
-        int jsonColumnCount = 0;
-        int columnCnt = table.getColumnCnt();
-        ColumnInfo[] columnInfo = table.getColumnInfo();
-        for (int i = 0; i < columnCnt; i++) {
-            ColumnInfo info = columnInfo[i];
-            if (info.type == LogEvent.MYSQL_TYPE_JSON) {
-                jsonColumnCount++;
-            }
-        }
-        this.jsonColumnCount = jsonColumnCount;
     }
 
     public final long getTableId() {
@@ -215,7 +194,7 @@ public abstract class RowsLogEvent extends LogEvent {
     }
 
     public final RowsLogBuffer getRowsBuf(String charsetName) {
-        return new RowsLogBuffer(rowsBuf, columnLen, charsetName, jsonColumnCount, partial);
+        return new RowsLogBuffer(rowsBuf, columnLen, charsetName);
     }
 
     public final int getFlags(final int flags) {

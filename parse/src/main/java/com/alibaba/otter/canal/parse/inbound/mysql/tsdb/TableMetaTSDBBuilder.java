@@ -36,6 +36,7 @@ public class TableMetaTSDBBuilder {
                 }
             }
             TableMetaTSDB tableMetaTSDB = (TableMetaTSDB) applicationContext.getBean("tableMetaTSDB");
+            tableMetaTSDB.init(destination);
             logger.info("{} init TableMetaTSDB with {}", destination, springXml);
             return tableMetaTSDB;
         } else {

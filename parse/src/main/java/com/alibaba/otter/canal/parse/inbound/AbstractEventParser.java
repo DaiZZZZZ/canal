@@ -181,8 +181,6 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
                             serverId = queryServerId;
                         }
                         // 4. 获取最后的位置信息
-                        long start = System.currentTimeMillis();
-                        logger.warn("---> begin to find start position, it will be long time for reset or first position");
                         EntryPosition position = findStartPosition(erosaConnection);
                         final EntryPosition startPosition = position;
                         if (startPosition == null) {
@@ -193,10 +191,7 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
                             throw new CanalParseException("can't find init table meta for " + destination
                                                           + " with position : " + startPosition);
                         }
-                        long end = System.currentTimeMillis();
-                        logger.warn("---> find start position successfully, {}", startPosition.toString() + " cost : "
-                                                                                 + (end - start)
-                                                                                 + "ms , the next step is binlog dump");
+                        logger.warn("find start position : {}", startPosition.toString());
                         // 重新链接，因为在找position过程中可能有状态，需要断开后重建
                         erosaConnection.reconnect();
 
@@ -322,10 +317,10 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
                     eventSink.interrupt();
                     transactionBuffer.reset();// 重置一下缓冲队列，重新记录数据
                     binlogParser.reset();// 重新置位
-                    if (multiStageCoprocessor != null && multiStageCoprocessor.isStart()) {
+                    if (multiStageCoprocessor != null) {
                         // 处理 RejectedExecutionException
                         try {
-                            multiStageCoprocessor.stop();
+                            multiStageCoprocessor.reset();
                         } catch (Throwable t) {
                             logger.debug("multi processor rejected:", t);
                         }
@@ -358,11 +353,7 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
         eventSink.interrupt();
 
         if (multiStageCoprocessor != null && multiStageCoprocessor.isStart()) {
-            try {
-                multiStageCoprocessor.stop();
-            } catch (Throwable t) {
-                logger.debug("multi processor rejected:", t);
-            }
+            multiStageCoprocessor.stop();
         }
 
         try {

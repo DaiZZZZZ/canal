@@ -55,9 +55,6 @@ public class LocalBinlogEventParser extends AbstractMysqlEventParser implements 
             ((DatabaseTableMeta) tableMetaTSDB).setConnection(metaConnection);
             ((DatabaseTableMeta) tableMetaTSDB).setFilter(eventFilter);
             ((DatabaseTableMeta) tableMetaTSDB).setBlackFilter(eventBlackFilter);
-            ((DatabaseTableMeta) tableMetaTSDB).setSnapshotInterval(tsdbSnapshotInterval);
-            ((DatabaseTableMeta) tableMetaTSDB).setSnapshotExpire(tsdbSnapshotExpire);
-            ((DatabaseTableMeta) tableMetaTSDB).init(destination);
         }
 
         tableMetaCache = new TableMetaCache(metaConnection, tableMetaTSDB);
