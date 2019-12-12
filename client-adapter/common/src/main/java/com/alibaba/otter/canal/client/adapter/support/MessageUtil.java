@@ -37,6 +37,7 @@ public class MessageUtil {
             CanalEntry.EventType eventType = rowChange.getEventType();
 
             final Dml dml = new Dml();
+            dml.setIsDdl(rowChange.getIsDdl());
             dml.setDestination(destination);
             dml.setGroupId(groupId);
             dml.setDatabase(entry.getHeader().getSchemaName());
@@ -75,11 +76,16 @@ public class MessageUtil {
                                 dml.getPkNames().add(column.getName());
                             }
                         }
-                        row.put(column.getName(),
-                            JdbcTypeUtil.typeConvert(column.getName(),
-                                column.getValue(),
-                                column.getSqlType(),
-                                column.getMysqlType()));
+                        if (column.getIsNull()) {
+                            row.put(column.getName(), null);
+                        } else {
+                            row.put(column.getName(),
+                                JdbcTypeUtil.typeConvert(dml.getTable(),
+                                    column.getName(),
+                                    column.getValue(),
+                                    column.getSqlType(),
+                                    column.getMysqlType()));
+                        }
                         // 获取update为true的字段
                         if (column.getUpdated()) {
                             updateSet.add(column.getName());
@@ -93,11 +99,16 @@ public class MessageUtil {
                         Map<String, Object> rowOld = new LinkedHashMap<>();
                         for (CanalEntry.Column column : rowData.getBeforeColumnsList()) {
                             if (updateSet.contains(column.getName())) {
-                                rowOld.put(column.getName(),
-                                    JdbcTypeUtil.typeConvert(column.getName(),
-                                        column.getValue(),
-                                        column.getSqlType(),
-                                        column.getMysqlType()));
+                                if (column.getIsNull()) {
+                                    rowOld.put(column.getName(), null);
+                                } else {
+                                    rowOld.put(column.getName(),
+                                        JdbcTypeUtil.typeConvert(dml.getTable(),
+                                            column.getName(),
+                                            column.getValue(),
+                                            column.getSqlType(),
+                                            column.getMysqlType()));
+                                }
                             }
                         }
                         // update操作将记录修改前的值
@@ -152,17 +163,17 @@ public class MessageUtil {
         // }
         List<Map<String, String>> data = flatMessage.getData();
         if (data != null) {
-            dml.setData(changeRows(data, flatMessage.getSqlType(), flatMessage.getMysqlType()));
+            dml.setData(changeRows(dml.getTable(), data, flatMessage.getSqlType(), flatMessage.getMysqlType()));
         }
         List<Map<String, String>> old = flatMessage.getOld();
         if (old != null) {
-            dml.setOld(changeRows(old, flatMessage.getSqlType(), flatMessage.getMysqlType()));
+            dml.setOld(changeRows(dml.getTable(), old, flatMessage.getSqlType(), flatMessage.getMysqlType()));
         }
         return dml;
     }
 
-    private static List<Map<String, Object>> changeRows(List<Map<String, String>> rows, Map<String, Integer> sqlTypes,
-                                                        Map<String, String> mysqlTypes) {
+    private static List<Map<String, Object>> changeRows(String table, List<Map<String, String>> rows,
+                                                        Map<String, Integer> sqlTypes, Map<String, String> mysqlTypes) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, String> row : rows) {
             Map<String, Object> resultRow = new LinkedHashMap<>();
@@ -180,7 +191,7 @@ public class MessageUtil {
                     continue;
                 }
 
-                Object finalValue = JdbcTypeUtil.typeConvert(columnName, columnValue, sqlType, mysqlType);
+                Object finalValue = JdbcTypeUtil.typeConvert(table, columnName, columnValue, sqlType, mysqlType);
                 resultRow.put(columnName, finalValue);
             }
             result.add(resultRow);

@@ -1,11 +1,5 @@
 server:
   port: 8081
-logging:
-  level:
-    org.springframework: WARN
-    com.alibaba.otter.canal.client.adapter.hbase: DEBUG
-    com.alibaba.otter.canal.client.adapter.es: DEBUG
-    com.alibaba.otter.canal.client.adapter.rdb: DEBUG
 spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
@@ -13,6 +7,7 @@ spring:
     default-property-inclusion: non_null
 
 canal.conf:
+  mode: tcp # kafka rocketMQ
   canalServerHost: 127.0.0.1:11111
 #  zookeeperHosts: slave1:2181
 #  mqServers: 127.0.0.1:9092 #or rocketmq
@@ -23,7 +18,9 @@ canal.conf:
   timeout:
   accessKey:
   secretKey:
-  mode: tcp # kafka rocketMQ
+  username:
+  password:
+  vhost:
 #  srcDataSources:
 #    defaultDS:
 #      url: jdbc:mysql://127.0.0.1:3306/mytest?useUnicode=true
@@ -64,6 +61,9 @@ canal.conf:
 #          hbase.zookeeper.property.clientPort: 2181
 #          zookeeper.znode.parent: /hbase
 #      - name: es
-#        hosts: 127.0.0.1:9300
+#        hosts: 127.0.0.1:9300 # 127.0.0.1:9200 for rest mode
 #        properties:
+#          mode: transport # or rest
+#          # security.auth: test:123456 #  only used for rest mode
 #          cluster.name: elasticsearch
+

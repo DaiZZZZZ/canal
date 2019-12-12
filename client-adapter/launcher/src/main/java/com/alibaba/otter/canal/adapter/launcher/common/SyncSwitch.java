@@ -34,7 +34,7 @@ public class SyncSwitch {
 
     private static final Map<String, BooleanMutex> DISTRIBUTED_LOCK   = new ConcurrentHashMap<>();
 
-    private static Mode                            mode               = Mode.LOCAL;
+    private Mode                                   mode               = Mode.LOCAL;
 
     @Resource
     private AdapterCanalConfig                     adapterCanalConfig;
@@ -60,6 +60,27 @@ public class SyncSwitch {
             for (String destination : adapterCanalConfig.DESTINATIONS) {
                 // 对应每个destination注册锁
                 LOCAL_LOCK.put(destination, new BooleanMutex(true));
+            }
+        }
+    }
+
+    public synchronized void refresh() {
+        for (String destination : adapterCanalConfig.DESTINATIONS) {
+            BooleanMutex booleanMutex;
+            if (mode == Mode.DISTRIBUTED) {
+                CuratorFramework curator = curatorClient.getCurator();
+                booleanMutex = DISTRIBUTED_LOCK.get(destination);
+                if (booleanMutex == null) {
+                    BooleanMutex mutex = new BooleanMutex(true);
+                    initMutex(curator, destination, mutex);
+                    DISTRIBUTED_LOCK.put(destination, mutex);
+                    startListen(destination, mutex);
+                }
+            } else {
+                booleanMutex = LOCAL_LOCK.get(destination);
+                if (booleanMutex == null) {
+                    LOCAL_LOCK.put(destination, new BooleanMutex(true));
+                }
             }
         }
     }
@@ -165,20 +186,20 @@ public class SyncSwitch {
         }
     }
 
-    public Boolean status(String destination) {
+    public boolean status(String destination) {
         if (mode == Mode.LOCAL) {
             BooleanMutex mutex = LOCAL_LOCK.get(destination);
             if (mutex != null) {
                 return mutex.state();
             } else {
-                return null;
+                return false;
             }
         } else {
             BooleanMutex mutex = DISTRIBUTED_LOCK.get(destination);
             if (mutex != null) {
                 return mutex.state();
             } else {
-                return null;
+                return false;
             }
         }
     }

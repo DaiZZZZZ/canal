@@ -1,13 +1,19 @@
 package com.alibaba.otter.canal.client.adapter.rdb.test.sync;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.alibaba.otter.canal.client.adapter.rdb.RdbAdapter;
 import com.alibaba.otter.canal.client.adapter.support.Dml;
-
+@Ignore
 public class OracleSyncTest {
 
     private RdbAdapter rdbAdapter;

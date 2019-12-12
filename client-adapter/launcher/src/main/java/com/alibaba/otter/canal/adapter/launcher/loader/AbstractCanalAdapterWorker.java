@@ -3,7 +3,6 @@ package com.alibaba.otter.canal.adapter.launcher.loader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -17,6 +16,7 @@ import com.alibaba.otter.canal.client.adapter.OuterAdapter;
 import com.alibaba.otter.canal.client.adapter.support.CanalClientConfig;
 import com.alibaba.otter.canal.client.adapter.support.Dml;
 import com.alibaba.otter.canal.client.adapter.support.MessageUtil;
+import com.alibaba.otter.canal.client.adapter.support.Util;
 import com.alibaba.otter.canal.protocol.FlatMessage;
 import com.alibaba.otter.canal.protocol.Message;
 
@@ -43,7 +43,7 @@ public abstract class AbstractCanalAdapterWorker {
 
     public AbstractCanalAdapterWorker(List<List<OuterAdapter>> canalOuterAdapters){
         this.canalOuterAdapters = canalOuterAdapters;
-        this.groupInnerExecutorService = Executors.newFixedThreadPool(canalOuterAdapters.size());
+        this.groupInnerExecutorService = Util.newFixedThreadPool(canalOuterAdapters.size(), 5000L);
         syncSwitch = (SyncSwitch) SpringContext.getBean(SyncSwitch.class);
     }
 
@@ -151,6 +151,9 @@ public abstract class AbstractCanalAdapterWorker {
                     if (flatMessage) {
                         // batch write
                         writeOut((List<FlatMessage>) messages);
+                        // FIXME xxx
+                        // messages.forEach((message ->
+                        // System.out.println(JSON.toJSONString(message))));
                     } else {
                         for (final Object message : messages) {
                             writeOut((Message) message);
@@ -201,7 +204,11 @@ public abstract class AbstractCanalAdapterWorker {
             List<Dml> dmlsBatch = new ArrayList<>();
             for (Dml dml : dmls) {
                 dmlsBatch.add(dml);
-                len += dml.getData().size();
+                if (dml.getData() == null || dml.getData().isEmpty()) {
+                    len += 1;
+                } else {
+                    len += dml.getData().size();
+                }
                 if (len >= canalClientConfig.getSyncBatchSize()) {
                     adapter.sync(dmlsBatch);
                     dmlsBatch.clear();

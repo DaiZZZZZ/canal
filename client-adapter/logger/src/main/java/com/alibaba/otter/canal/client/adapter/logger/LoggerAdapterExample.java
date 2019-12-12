@@ -27,7 +27,6 @@ public class LoggerAdapterExample implements OuterAdapter {
 
     @Override
     public void init(OuterAdapterConfig configuration, Properties envProperties) {
-
     }
 
     public void sync(List<Dml> dmls) {
@@ -42,6 +41,5 @@ public class LoggerAdapterExample implements OuterAdapter {
 
     @Override
     public void destroy() {
-
     }
 }

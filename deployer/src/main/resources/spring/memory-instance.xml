@@ -81,6 +81,10 @@
 				<constructor-arg index="1" value="false" />
 			</bean>
 		</property>
+		
+		<property name="fieldFilter" value="${canal.instance.filter.field}" />
+		<property name="fieldBlackFilter" value="${canal.instance.filter.black.field}" />
+		
 		<!-- 最大事务解析大小，超过该大小后事务将被切分为多个事务投递 -->
 		<property name="transactionSize" value="${canal.instance.transaction.size:1024}" />
 
@@ -109,7 +113,7 @@
 				<property name="password" value="${canal.instance.dbPassword:retl}" />
 				<property name="pwdPublicKey" value="${canal.instance.pwdPublicKey:retl}" />
 				<property name="enableDruid" value="${canal.instance.enableDruid:false}" />
-				<property name="defaultDatabaseName" value="${canal.instance.defaultDatabaseName:test}" />
+				<property name="defaultDatabaseName" value="${canal.instance.defaultDatabaseName:}" />
 			</bean>
 		</property>
 		<property name="standbyInfo">
@@ -119,7 +123,7 @@
 				<property name="password" value="${canal.instance.dbPassword:retl}" />
 				<property name="pwdPublicKey" value="${canal.instance.pwdPublicKey:retl}" />
 				<property name="enableDruid" value="${canal.instance.enableDruid:false}" />
-				<property name="defaultDatabaseName" value="${canal.instance.defaultDatabaseName:test}" />
+				<property name="defaultDatabaseName" value="${canal.instance.defaultDatabaseName:}" />
 			</bean>
 		</property>
 

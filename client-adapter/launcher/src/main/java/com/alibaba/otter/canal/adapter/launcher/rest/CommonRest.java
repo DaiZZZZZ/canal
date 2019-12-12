@@ -1,13 +1,23 @@
 package com.alibaba.otter.canal.adapter.launcher.rest;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.alibaba.otter.canal.adapter.launcher.common.EtlLock;
 import com.alibaba.otter.canal.adapter.launcher.common.SyncSwitch;
@@ -69,16 +79,16 @@ public class CommonRest {
         }
         try {
 
-            Boolean oriSwitchStatus;
+            boolean oriSwitchStatus;
             if (destination != null) {
                 oriSwitchStatus = syncSwitch.status(destination);
-                if (oriSwitchStatus != null && oriSwitchStatus) {
+                if (oriSwitchStatus) {
                     syncSwitch.off(destination);
                 }
             } else {
                 // task可能为destination，直接锁task
                 oriSwitchStatus = syncSwitch.status(task);
-                if (oriSwitchStatus != null && oriSwitchStatus) {
+                if (oriSwitchStatus) {
                     syncSwitch.off(task);
                 }
             }
@@ -89,9 +99,9 @@ public class CommonRest {
                 }
                 return adapter.etl(task, paramArray);
             } finally {
-                if (destination != null && oriSwitchStatus != null && oriSwitchStatus) {
+                if (destination != null && oriSwitchStatus) {
                     syncSwitch.on(destination);
-                } else if (destination == null && oriSwitchStatus != null && oriSwitchStatus) {
+                } else if (destination == null && oriSwitchStatus) {
                     syncSwitch.on(task);
                 }
             }
@@ -102,7 +112,7 @@ public class CommonRest {
 
     /**
      * ETL curl http://127.0.0.1:8081/etl/hbase/mytest_person2.yml -X POST
-     * 
+     *
      * @param type 类型 hbase, es
      * @param task 任务名对应配置文件名 mytest_person2.yml
      * @param params etl where条件参数, 为空全部导入
@@ -129,7 +139,7 @@ public class CommonRest {
 
     /**
      * 统计总数 curl http://127.0.0.1:8081/count/hbase/mytest_person2.yml
-     * 
+     *
      * @param type 类型 hbase, es
      * @param task 任务名对应配置文件名 mytest_person2.yml
      * @return
@@ -148,11 +158,11 @@ public class CommonRest {
         Set<String> destinations = adapterCanalConfig.DESTINATIONS;
         for (String destination : destinations) {
             Map<String, String> resMap = new LinkedHashMap<>();
-            Boolean status = syncSwitch.status(destination);
-            String resStatus = "none";
-            if (status != null && status) {
+            boolean status = syncSwitch.status(destination);
+            String resStatus;
+            if (status) {
                 resStatus = "on";
-            } else if (status != null && !status) {
+            } else {
                 resStatus = "off";
             }
             resMap.put("destination", destination);
@@ -164,7 +174,7 @@ public class CommonRest {
 
     /**
      * 实例同步开关 curl http://127.0.0.1:8081/syncSwitch/example/off -X PUT
-     * 
+     *
      * @param destination 实例名称
      * @param status 开关状态: off on
      * @return
@@ -189,17 +199,17 @@ public class CommonRest {
 
     /**
      * 获取实例开关状态 curl http://127.0.0.1:8081/syncSwitch/example
-     * 
+     *
      * @param destination 实例名称
      * @return
      */
     @GetMapping("/syncSwitch/{destination}")
     public Map<String, String> etl(@PathVariable String destination) {
-        Boolean status = syncSwitch.status(destination);
-        String resStatus = "none";
-        if (status != null && status) {
+        boolean status = syncSwitch.status(destination);
+        String resStatus;
+        if (status) {
             resStatus = "on";
-        } else if (status != null && !status) {
+        } else {
             resStatus = "off";
         }
         Map<String, String> res = new LinkedHashMap<>();

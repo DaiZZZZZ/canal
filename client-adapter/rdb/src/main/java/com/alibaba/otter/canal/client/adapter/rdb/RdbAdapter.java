@@ -8,8 +8,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.sql.DataSource;
-
 import org.apache.commons.lang.BooleanUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -25,7 +23,11 @@ import com.alibaba.otter.canal.client.adapter.rdb.service.RdbEtlService;
 import com.alibaba.otter.canal.client.adapter.rdb.service.RdbMirrorDbSyncService;
 import com.alibaba.otter.canal.client.adapter.rdb.service.RdbSyncService;
 import com.alibaba.otter.canal.client.adapter.rdb.support.SyncUtil;
-import com.alibaba.otter.canal.client.adapter.support.*;
+import com.alibaba.otter.canal.client.adapter.support.Dml;
+import com.alibaba.otter.canal.client.adapter.support.EtlResult;
+import com.alibaba.otter.canal.client.adapter.support.OuterAdapterConfig;
+import com.alibaba.otter.canal.client.adapter.support.SPI;
+import com.alibaba.otter.canal.client.adapter.support.Util;
 
 /**
  * RDB适配器实现类
@@ -75,8 +77,8 @@ public class RdbAdapter implements OuterAdapter {
         // 过滤不匹配的key的配置
         rdbMappingTmp.forEach((key, mappingConfig) -> {
             if ((mappingConfig.getOuterAdapterKey() == null && configuration.getKey() == null)
-                || (mappingConfig.getOuterAdapterKey() != null
-                    && mappingConfig.getOuterAdapterKey().equalsIgnoreCase(configuration.getKey()))) {
+                || (mappingConfig.getOuterAdapterKey() != null && mappingConfig.getOuterAdapterKey()
+                    .equalsIgnoreCase(configuration.getKey()))) {
                 rdbMapping.put(key, mappingConfig);
             }
         });
@@ -123,6 +125,9 @@ public class RdbAdapter implements OuterAdapter {
         dataSource.setTimeBetweenEvictionRunsMillis(60000);
         dataSource.setMinEvictableIdleTimeMillis(300000);
         dataSource.setUseUnfairLock(true);
+        // List<String> array = new ArrayList<>();
+        // array.add("set names utf8mb4;");
+        // dataSource.setConnectionInitSqls(array);
 
         try {
             dataSource.init();
@@ -133,8 +138,8 @@ public class RdbAdapter implements OuterAdapter {
         String threads = properties.get("threads");
         // String commitSize = properties.get("commitSize");
 
-        boolean skipDupException = BooleanUtils
-            .toBoolean(configuration.getProperties().getOrDefault("skipDupException", "true"));
+        boolean skipDupException = BooleanUtils.toBoolean(configuration.getProperties()
+            .getOrDefault("skipDupException", "true"));
         rdbSyncService = new RdbSyncService(dataSource,
             threads != null ? Integer.valueOf(threads) : null,
             skipDupException);
@@ -146,7 +151,7 @@ public class RdbAdapter implements OuterAdapter {
             skipDupException);
 
         rdbConfigMonitor = new RdbConfigMonitor();
-        rdbConfigMonitor.init(configuration.getKey(), this);
+        rdbConfigMonitor.init(configuration.getKey(), this, envProperties);
     }
 
     /**
@@ -178,27 +183,16 @@ public class RdbAdapter implements OuterAdapter {
     public EtlResult etl(String task, List<String> params) {
         EtlResult etlResult = new EtlResult();
         MappingConfig config = rdbMapping.get(task);
+        RdbEtlService rdbEtlService = new RdbEtlService(dataSource, config);
         if (config != null) {
-            DataSource srcDataSource = DatasourceConfig.DATA_SOURCES.get(config.getDataSourceKey());
-            if (srcDataSource != null) {
-                return RdbEtlService.importData(srcDataSource, dataSource, config, params);
-            } else {
-                etlResult.setSucceeded(false);
-                etlResult.setErrorMessage("DataSource not found");
-                return etlResult;
-            }
+            return rdbEtlService.importData(params);
         } else {
             StringBuilder resultMsg = new StringBuilder();
             boolean resSucc = true;
-            // ds不为空说明传入的是destination
             for (MappingConfig configTmp : rdbMapping.values()) {
                 // 取所有的destination为task的配置
                 if (configTmp.getDestination().equals(task)) {
-                    DataSource srcDataSource = DatasourceConfig.DATA_SOURCES.get(configTmp.getDataSourceKey());
-                    if (srcDataSource == null) {
-                        continue;
-                    }
-                    EtlResult etlRes = RdbEtlService.importData(srcDataSource, dataSource, configTmp, params);
+                    EtlResult etlRes = rdbEtlService.importData(params);
                     if (!etlRes.getSucceeded()) {
                         resSucc = false;
                         resultMsg.append(etlRes.getErrorMessage()).append("\n");

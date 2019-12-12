@@ -62,6 +62,7 @@ public class BatchExecutor implements Closeable {
 
         pstmt.execute();
         idx.incrementAndGet();
+        pstmt.close();
     }
 
     public void commit() throws SQLException {

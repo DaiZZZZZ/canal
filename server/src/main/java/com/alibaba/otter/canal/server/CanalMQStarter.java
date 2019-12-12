@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import com.alibaba.otter.canal.common.MQProperties;
 import com.alibaba.otter.canal.instance.core.CanalInstance;
@@ -41,7 +42,7 @@ public class CanalMQStarter {
         this.canalMQProducer = canalMQProducer;
     }
 
-    public synchronized void start(MQProperties properties) {
+    public synchronized void start(MQProperties properties, String destinations) {
         try {
             if (running) {
                 return;
@@ -53,19 +54,14 @@ public class CanalMQStarter {
                 System.setProperty("canal.instance.filter.transaction.entry", "true");
             }
 
-            if (properties.getFlatMessage()) {
-                // 针对flat message模式,设置为raw避免ByteString->Entry的二次解析
-                System.setProperty("canal.instance.memory.rawEntry", "false");
-            }
-
             canalServer = CanalServerWithEmbedded.instance();
 
             // 对应每个instance启动一个worker线程
             executorService = Executors.newCachedThreadPool();
             logger.info("## start the MQ workers.");
 
-            String[] destinations = StringUtils.split(System.getProperty("canal.destinations"), ",");
-            for (String destination : destinations) {
+            String[] dsts = StringUtils.split(destinations, ",");
+            for (String destination : dsts) {
                 destination = destination.trim();
                 CanalMQRunnable canalMQRunnable = new CanalMQRunnable(destination);
                 canalMQWorks.put(destination, canalMQRunnable);
@@ -133,10 +129,16 @@ public class CanalMQStarter {
     }
 
     private void worker(String destination, AtomicBoolean destinationRunning) {
-        while (!running || !destinationRunning.get())
-            ;
-        logger.info("## start the MQ producer: {}.", destination);
+        while (!running || !destinationRunning.get()) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // ignore
+            }
+        }
 
+        logger.info("## start the MQ producer: {}.", destination);
+        MDC.put("destination", destination);
         final ClientIdentity clientIdentity = new ClientIdentity(destination, (short) 1001, "");
         while (running && destinationRunning.get()) {
             try {
@@ -166,8 +168,10 @@ public class CanalMQStarter {
                 while (running && destinationRunning.get()) {
                     Message message;
                     if (getTimeout != null && getTimeout > 0) {
-                        message = canalServer
-                            .getWithoutAck(clientIdentity, getBatchSize, getTimeout, TimeUnit.MILLISECONDS);
+                        message = canalServer.getWithoutAck(clientIdentity,
+                            getBatchSize,
+                            getTimeout,
+                            TimeUnit.MILLISECONDS);
                     } else {
                         message = canalServer.getWithoutAck(clientIdentity, getBatchSize);
                     }

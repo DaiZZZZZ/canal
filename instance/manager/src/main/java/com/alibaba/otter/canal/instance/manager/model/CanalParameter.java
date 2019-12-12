@@ -118,8 +118,12 @@ public class CanalParameter implements Serializable {
     private String                   standbyLogfileName                 = null;                      // standby起始位置
     private Long                     standbyLogfileOffest               = null;
     private Long                     standbyTimestamp                   = null;
-    private boolean                  parallel                           = true;
+    private Boolean                  parallel                           = Boolean.FALSE;
 
+    //自定义alarmHandler类全路径
+    private String                   alarmHandlerClass                  = null;
+    //自定义alarmHandler插件文件夹路径
+    private String                   alarmHandlerPluginDir              = null;
 
     public static enum RunMode {
 
@@ -984,12 +988,28 @@ public class CanalParameter implements Serializable {
         this.tsdbSnapshotExpire = tsdbSnapshotExpire;
     }
 
-    public boolean isParallel() {
+    public Boolean getParallel() {
         return parallel;
     }
 
-    public void setParallel(boolean parallel) {
+    public void setParallel(Boolean parallel) {
         this.parallel = parallel;
+    }
+
+    public String getAlarmHandlerClass() {
+        return alarmHandlerClass;
+    }
+
+    public void setAlarmHandlerClass(String alarmHandlerClass) {
+        this.alarmHandlerClass = alarmHandlerClass;
+    }
+
+    public String getAlarmHandlerPluginDir() {
+        return alarmHandlerPluginDir;
+    }
+
+    public void setAlarmHandlerPluginDir(String alarmHandlerPluginDir) {
+        this.alarmHandlerPluginDir = alarmHandlerPluginDir;
     }
 
     public String toString() {
